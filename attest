@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+VERBOSE=0
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+	-v | --verbose)
+		VERBOSE=1
+		shift
+		;;
+	-*)
+		echo "Unknown option: $1"
+		exit 1
+		;;
+	*)
+		if [[ -z "${TAR_FILE:-}" ]]; then
+			TAR_FILE="$1"
+		elif [[ -z "${REPO_DIR:-}" ]]; then
+			REPO_DIR="$1"
+		else
+			echo "Unexpected argument: $1"
+			exit 1
+		fi
+		shift
+		;;
+	esac
+done
+
+REPO_DIR="${REPO_DIR:-.}"
+
+# Ensure the tar file exists
+if [[ ! -f "$TAR_FILE" ]]; then
+	echo "Tar file not found: $TAR_FILE"
+	exit 1
+fi
+
+# Absolute paths
+TAR_FILE="$(realpath "$TAR_FILE")"
+REPO_DIR="$(realpath "$REPO_DIR")"
+
+# Create a temp directory for extracted files
+TMP_DIR="$(mktemp -d)"
+trap 'rm -rf "$TMP_DIR"' EXIT
+
+# Extract the tarball
+tar -xzf "$TAR_FILE" -C "$TMP_DIR"
+
+# Determine the top-level directory in the archive
+ARCHIVE_ROOT="$(find "$TMP_DIR" -mindepth 1 -maxdepth 1 -type d)"
+
+# Compare all files tracked by Git
+cd "$REPO_DIR"
+EXIT_CODE=0
+
+# Build a list of git-tracked files
+mapfile -t GIT_FILES < <(git ls-files)
+
+# Create a set-like map for quick lookup
+declare -A GIT_FILE_MAP
+for f in "${GIT_FILES[@]}"; do
+	GIT_FILE_MAP["$f"]=1
+done
+
+for file in "${GIT_FILES[@]}"; do
+	[[ -d "$file" ]] && continue
+
+	ARCHIVE_FILE="$ARCHIVE_ROOT/$file"
+
+	if [[ ! -f "$ARCHIVE_FILE" ]]; then
+		echo "❌ Missing in archive: $file"
+		EXIT_CODE=1
+		continue
+	fi
+
+	REPO_HASH=$(sha256sum "$file" | awk '{print $1}')
+	ARCHIVE_HASH=$(sha256sum "$ARCHIVE_FILE" | awk '{print $1}')
+
+	if [[ "$REPO_HASH" != "$ARCHIVE_HASH" ]]; then
+		echo "❌ Mismatch: $file"
+		EXIT_CODE=1
+	else
+		# Compare file modes
+		REPO_MODE=$(stat -c '%a' "$file")
+		ARCHIVE_MODE=$(stat -c '%a' "$ARCHIVE_FILE")
+		if [[ "$REPO_MODE" != "$ARCHIVE_MODE" ]]; then
+			echo "❌ Mode mismatch: $file (repo: $REPO_MODE, archive: $ARCHIVE_MODE)"
+			EXIT_CODE=1
+		elif [[ "$VERBOSE" -eq 1 ]]; then
+			echo "✅ Match: $file"
+		fi
+	fi
+done
+
+# Find all files in the archive (excluding directories)
+ARCHIVE_FILES=$(cd "$ARCHIVE_ROOT" && find . -type f | sed 's|^\./||')
+
+# Check for unexpected files in the archive
+for archive_file in $ARCHIVE_FILES; do
+	if [[ -z "${GIT_FILE_MAP["$archive_file"]+exists}" ]]; then
+		echo "❌ Extra file in archive not tracked by Git: $archive_file"
+		EXIT_CODE=1
+	fi
+done
+
+exit $EXIT_CODE
