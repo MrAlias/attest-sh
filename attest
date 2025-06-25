@@ -45,8 +45,17 @@ REPO_DIR="$(realpath "$REPO_DIR")"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-# Extract the tarball
-tar -xzf "$TAR_FILE" -C "$TMP_DIR"
+
+if [[ "$TAR_FILE" == *.tar.gz ]]; then
+	# Extract the tarball
+	tar -xzf "$TAR_FILE" -C "$TMP_DIR"
+elif [[ "$TAR_FILE" == *.zip ]]; then
+	# Extract the zip file
+	unzip -q "$TAR_FILE" -d "$TMP_DIR"
+else
+	echo "❌ Unsupported file extension for: $TAR_FILE"
+	exit 2
+fi
 
 # Determine the top-level directory in the archive
 ARCHIVE_ROOT="$(find "$TMP_DIR" -mindepth 1 -maxdepth 1 -type d)"
@@ -81,17 +90,23 @@ for file in "${GIT_FILES[@]}"; do
 	if [[ "$REPO_HASH" != "$ARCHIVE_HASH" ]]; then
 		echo "❌ Mismatch: $file"
 		EXIT_CODE=1
-	else
-		# Compare file modes
+		continue
+	fi
+	
+	if [[ "$TAR_FILE" != *.zip ]]; then
+		# Compare file modes (zip does not preserve file permissions)
 		REPO_MODE=$(stat -c '%a' "$file")
 		ARCHIVE_MODE=$(stat -c '%a' "$ARCHIVE_FILE")
 		if [[ "$REPO_MODE" != "$ARCHIVE_MODE" ]]; then
 			echo "❌ Mode mismatch: $file (repo: $REPO_MODE, archive: $ARCHIVE_MODE)"
 			EXIT_CODE=1
-		elif [[ "$VERBOSE" -eq 1 ]]; then
-			echo "✅ Match: $file"
 		fi
 	fi
+	
+	if [[ "$VERBOSE" -eq 1 ]]; then
+		echo "✅ Match: $file"
+	fi
+
 done
 
 # Find all files in the archive (excluding directories)
