@@ -1,14 +1,14 @@
 # 🔬 attest
 
-This is a simple tool to verify the contents of a GitHub release tarball against the original repository.
+This is a simple tool to verify the contents of a GitHub release tarball or zip file against the original repository.
 
 ## 📋 What This Script Does
 
-- Extracts a `.tar.gz` archive.
+- Extracts a `.tar.gz` or `.zip` archive.
 - Compares each Git-tracked file against its counterpart in the archive.
 - Verifies:
   - File content (SHA-256 hash)
-  - File permission modes (e.g., `0644`, `0755`)
+  - File permission modes when applicable (e.g., `0644`, `0755`)
 - Reports:
   - Missing files in the archive
   - Extra files in the archive
@@ -23,6 +23,7 @@ This is a simple tool to verify the contents of a GitHub release tarball against
 - **Operating System**: Unix-like system (Linux, macOS, WSL)
 - **Bash**: Bash 4.x or higher (required for associative arrays)
 - **git**: Used to list and verify tracked files (`git ls-files`)
+- **unzip**: Use to extract zip archives
 
 #### ✅ Required Command-Line Tools
 
@@ -65,7 +66,7 @@ Then update the script to use:
 ## 🏁 Usage
 
 ```sh
-./attest [-v] <archive.tar.gz> [repo-dir]
+./attest [-v] <archive> [repo-dir]
 ```
 
 ### Options
@@ -74,7 +75,7 @@ Then update the script to use:
 
 ### Arguments
 
-- `archive.tar.gz`: Path to the `.tar.gz` archive
+- `archive`: Path to the `.tar.gz` or `.zip` archive
 - `repo-dir` (optional): Path to the Git repository (defaults to `.`)
 
 ## ✅ Example
