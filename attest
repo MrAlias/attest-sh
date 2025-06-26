@@ -16,8 +16,8 @@ while [[ $# -gt 0 ]]; do
 		exit 1
 		;;
 	*)
-		if [[ -z "${TAR_FILE:-}" ]]; then
-			TAR_FILE="$1"
+		if [[ -z "${INPUT_FILE:-}" ]]; then
+			INPUT_FILE="$1"
 		elif [[ -z "${REPO_DIR:-}" ]]; then
 			REPO_DIR="$1"
 		else
@@ -32,13 +32,13 @@ done
 REPO_DIR="${REPO_DIR:-.}"
 
 # Ensure the tar file exists
-if [[ ! -f "$TAR_FILE" ]]; then
-	echo "Tar file not found: $TAR_FILE"
+if [[ ! -f "$INPUT_FILE" ]]; then
+	echo "Tar file not found: $INPUT_FILE"
 	exit 1
 fi
 
 # Absolute paths
-TAR_FILE="$(realpath "$TAR_FILE")"
+INPUT_FILE="$(realpath "$INPUT_FILE")"
 REPO_DIR="$(realpath "$REPO_DIR")"
 
 # Create a temp directory for extracted files
@@ -46,14 +46,14 @@ TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
 
-if [[ "$TAR_FILE" == *.tar.gz ]]; then
+if [[ "$INPUT_FILE" == *.tar.gz ]]; then
 	# Extract the tarball
-	tar -xzf "$TAR_FILE" -C "$TMP_DIR"
-elif [[ "$TAR_FILE" == *.zip ]]; then
+	tar -xzf "$INPUT_FILE" -C "$TMP_DIR"
+elif [[ "$INPUT_FILE" == *.zip ]]; then
 	# Extract the zip file
-	unzip -q "$TAR_FILE" -d "$TMP_DIR"
+	unzip -q "$INPUT_FILE" -d "$TMP_DIR"
 else
-	echo "❌ Unsupported file extension for: $TAR_FILE"
+	echo "❌ Unsupported file extension for: $INPUT_FILE"
 	exit 2
 fi
 
@@ -93,7 +93,7 @@ for file in "${GIT_FILES[@]}"; do
 		continue
 	fi
 	
-	if [[ "$TAR_FILE" != *.zip ]]; then
+	if [[ "$INPUT_FILE" != *.zip ]]; then
 		# Compare file modes (zip does not preserve file permissions)
 		REPO_MODE=$(stat -c '%a' "$file")
 		ARCHIVE_MODE=$(stat -c '%a' "$ARCHIVE_FILE")
